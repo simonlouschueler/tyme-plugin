@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-/**
- * Lightweight smoke test for the Tyme → Billy importer.
- * Runs with plain Node (CommonJS), no Billy host required.
- * Fixtures are synthetic — no real customer export data.
- */
+// Synthetic fixtures only — run with: node fixtures/smoke-test.js
 
 var fs = require('fs');
 var path = require('path');

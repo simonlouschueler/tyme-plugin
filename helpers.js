@@ -1,13 +1,10 @@
 /**
- * Shared parsing helpers for Tyme CSV / JSON exports.
+ * Parse a delimited CSV string into an array of plain objects keyed by the
+ * header row.
  *
- * Handles:
- *  - Comma or semicolon CSV (auto-detected from the header row)
- *  - Optional double-quoted fields
- *  - Blank lines
- *  - Tyme JSON array exports and API-shaped `{ data: [...] }` payloads
+ * Handles comma or semicolon delimiters (auto-detected), optional quotes,
+ * and blank lines.
  */
-
 exports.parseCSV = function (text) {
 	var lines = text.split(/\r?\n/);
 	if (!lines.length || !lines[0]) return [];
@@ -33,13 +30,7 @@ exports.parseCSV = function (text) {
 	return rows;
 };
 
-/**
- * Parse Tyme JSON export or Public API times payload into plain entry objects.
- * Accepts:
- *  - `[ {...}, ... ]`
- *  - `{ "data": [ {...}, ... ] }`
- *  - a single `{ ... }` entry object
- */
+// Tyme JSON export, API `{ data: [...] }`, or a single entry object.
 exports.parseJSONEntries = function (text) {
 	var parsed;
 	try {
@@ -54,31 +45,17 @@ exports.parseJSONEntries = function (text) {
 	return [];
 };
 
-/**
- * Detect whether raw file content looks like JSON rather than CSV.
- */
 exports.looksLikeJSON = function (text) {
 	var trimmed = (text || '').replace(/^\uFEFF/, '').trim();
 	return trimmed.charAt(0) === '[' || trimmed.charAt(0) === '{';
 };
 
-/**
- * Round to 2 decimal places to avoid floating-point noise.
- */
+// Avoid floating-point noise (e.g. 2.9999999 → 3).
 exports.round2 = function (value) {
 	return Math.round(value * 100) / 100;
 };
 
-/**
- * Round to 4 decimal places (useful for fractional hours before final rounding).
- */
-exports.round4 = function (value) {
-	return Math.round(value * 10000) / 10000;
-};
-
-/**
- * Read a row field by trying several header aliases (case-insensitive).
- */
+// Case-insensitive lookup across several possible header / key names.
 exports.field = function (row, aliases) {
 	if (!row) return '';
 
@@ -96,16 +73,7 @@ exports.field = function (row, aliases) {
 	return '';
 };
 
-/**
- * Convert a Tyme duration value to decimal hours.
- *
- * Accepts:
- *  - number of seconds (API `duration`)
- *  - number of minutes (plugin scripting `duration` with duration_unit "m")
- *  - decimal hours
- *  - `H:MM` / `HH:MM:SS` / `H.MM` style strings
- *  - German decimal commas (`1,5`)
- */
+// Seconds, minutes (Tyme’s usual unit), hours, H:MM(:SS), or German decimals.
 exports.durationToHours = function (raw, unitHint) {
 	if (raw == null || raw === '') return 0;
 
@@ -116,7 +84,6 @@ exports.durationToHours = function (raw, unitHint) {
 	var text = String(raw).trim();
 	if (!text) return 0;
 
-	// HH:MM(:SS)
 	if (/^\d+:\d{1,2}(:\d{1,2})?$/.test(text)) {
 		var parts = text.split(':').map(function (p) {
 			return parseInt(p, 10) || 0;
@@ -133,50 +100,34 @@ exports.durationToHours = function (raw, unitHint) {
 	return numericDurationToHours(num, unitHint);
 };
 
-/**
- * Derive a calendar date `YYYY-MM-DD` from a Tyme start/date field.
- */
+// → YYYY-MM-DD for Billy’s service dates.
 exports.toServiceDate = function (raw) {
 	if (raw == null || raw === '') return '';
 	var text = String(raw).trim();
 	if (!text) return '';
 
-	// Already ISO date or datetime
 	var iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
 	if (iso) return iso[1];
 
-	// Unix seconds
 	if (/^\d{10}$/.test(text)) {
 		var fromUnix = new Date(parseInt(text, 10) * 1000);
 		if (!isNaN(fromUnix.getTime())) return formatUTCDate(fromUnix);
 	}
 
-	// Unix milliseconds
 	if (/^\d{13}$/.test(text)) {
 		var fromMs = new Date(parseInt(text, 10));
 		if (!isNaN(fromMs.getTime())) return formatUTCDate(fromMs);
 	}
 
-	// dd.mm.yyyy or dd/mm/yyyy
 	var euro = text.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
 	if (euro) {
-		return (
-			euro[3] +
-			'-' +
-			pad2(euro[2]) +
-			'-' +
-			pad2(euro[1])
-		);
+		return euro[3] + '-' + pad2(euro[2]) + '-' + pad2(euro[1]);
 	}
 
 	var parsed = new Date(text);
 	if (!isNaN(parsed.getTime())) return formatUTCDate(parsed);
 	return '';
 };
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 function numericDurationToHours(num, unitHint) {
 	var unit = (unitHint || '').toString().trim().toLowerCase();
@@ -191,10 +142,7 @@ function numericDurationToHours(num, unitHint) {
 		return num / 3600;
 	}
 
-	// Heuristics when no unit is given:
-	// - values >= 1000 are almost certainly seconds (API style)
-	// - values >= 24 and < 1000 are likely minutes
-	// - otherwise treat as hours
+	// No unit: large values look like seconds, mid-range like minutes.
 	if (num >= 1000) return num / 3600;
 	if (num >= 24) return num / 60;
 	return num;

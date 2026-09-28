@@ -1,20 +1,16 @@
 var helpers = require('./helpers.js');
 
-/**
- * Import Tyme time entries as Billy invoice patches.
- *
- * One invoice per Tyme category (client), one Hour line item per task
- * (project-prefixed when useful). Matches the Timemator / Toggl Track pattern.
- */
 exports.importInvoices = function (fileContent, profile) {
 	var entries = loadEntries(fileContent);
 	if (!entries.length) return [];
 
+	// Tyme has no VAT info, so use the profile’s default VAT rate.
 	var vatPercentage =
 		profile && typeof profile.vatPercentage === 'number'
 			? profile.vatPercentage
 			: 0;
 
+	// Rows without a usable rate fall back to the profile’s hourly rate.
 	var fallbackRate =
 		profile && typeof profile.hourlyRate === 'number'
 			? profile.hourlyRate
@@ -30,9 +26,7 @@ exports.importInvoices = function (fileContent, profile) {
 
 	if (!normalizedEntries.length) return [];
 
-	// Prefer still-unbilled rows when the export marks billing state.
-	// If every row is already billed/paid, fall back to importing all of them
-	// (same idea as the Toggl Track plugin’s billable filter).
+	// Prefer unbilled rows when billing is marked; if none are unbilled, import all.
 	var hasUnbilled = normalizedEntries.some(function (entry) {
 		return !entry.explicitlyBilledOrPaid;
 	});
@@ -42,6 +36,7 @@ exports.importInvoices = function (fileContent, profile) {
 		});
 	}
 
+	// Group by category (one invoice each), then by task (one line item each).
 	var clients = {};
 
 	normalizedEntries.forEach(function (normalized) {
@@ -87,10 +82,6 @@ exports.importInvoices = function (fileContent, profile) {
 		});
 };
 
-// ---------------------------------------------------------------------------
-// Loading
-// ---------------------------------------------------------------------------
-
 function loadEntries(fileContent) {
 	if (!fileContent || !String(fileContent).trim()) return [];
 
@@ -100,10 +91,6 @@ function loadEntries(fileContent) {
 
 	return helpers.parseCSV(fileContent);
 }
-
-// ---------------------------------------------------------------------------
-// Normalization
-// ---------------------------------------------------------------------------
 
 var CLIENT_ALIASES = [
 	'category',
@@ -173,7 +160,7 @@ var NOTE_ALIASES = ['note', 'Notiz', 'Notes', 'Comment'];
 function normalizeEntry(entry) {
 	if (!entry || typeof entry !== 'object') return null;
 
-	// Skip non-time rows from mixed Tyme exports / API sync payloads.
+	// Skip mileage / expenses / project entities from mixed exports.
 	var type = helpers.field(entry, TYPE_ALIASES);
 	if (type) {
 		var lowerType = type.toLowerCase();
@@ -183,7 +170,6 @@ function normalizeEntry(entry) {
 			lowerType !== 'time' &&
 			lowerType.indexOf('timed') === -1
 		) {
-			// Keep CSV rows without a meaningful type filter; only skip clear non-time types.
 			if (
 				lowerType === 'mileage' ||
 				lowerType === 'expense' ||
@@ -214,27 +200,21 @@ function normalizeEntry(entry) {
 	var endRaw = firstPresent(entry, END_ALIASES);
 	var date = helpers.toServiceDate(startRaw) || helpers.toServiceDate(endRaw);
 
-	var rateRaw = firstPresent(entry, RATE_ALIASES);
-	// Tyme’s native JSON often ships `rate: 0` / `sum: 0` when no price is set.
-	// Treat non-positive values as missing so the Billy profile rate can apply.
-	var hourlyRate = positiveNumber(parseLocaleNumber(rateRaw));
+	// Tyme often sends rate/sum as 0 when unset — treat that as missing.
+	var hourlyRate = positiveNumber(parseLocaleNumber(firstPresent(entry, RATE_ALIASES)));
+	var revenue = positiveNumber(parseLocaleNumber(firstPresent(entry, REVENUE_ALIASES)));
 
-	var revenueRaw = firstPresent(entry, REVENUE_ALIASES);
-	var revenue = positiveNumber(parseLocaleNumber(revenueRaw));
-
-	// Derive rate from revenue when the export has a positive sum but no rate.
 	if (isNaN(hourlyRate) && !isNaN(revenue) && hours > 0) {
 		hourlyRate = revenue / hours;
 	}
 
 	var description = buildDescription(project, task, subtask);
-	var taskKey = description;
 	var billing = helpers.field(entry, BILLING_ALIASES);
 
 	return {
 		client: client || '',
 		description: description,
-		taskKey: taskKey,
+		taskKey: description,
 		hours: hours,
 		hourlyRate: hourlyRate,
 		revenue: revenue,
@@ -302,13 +282,7 @@ function buildInvoice(clientKey, group, options) {
 	return patch;
 }
 
-// ---------------------------------------------------------------------------
-// Field helpers
-// ---------------------------------------------------------------------------
-
 function firstPresent(row, aliases) {
-	// Prefer helpers.field for string lookup, but also accept bare property access
-	// for JSON objects that use the canonical Tyme keys.
 	var fromAlias = helpers.field(row, aliases);
 	if (fromAlias !== '') return fromAlias;
 
@@ -326,7 +300,8 @@ function parseLocaleNumber(raw) {
 	if (typeof raw === 'number') return isFinite(raw) ? raw : NaN;
 	var text = String(raw).trim();
 	if (!text) return NaN;
-	// Keep the last separator as decimal if both . and , appear.
+
+	// Last separator wins when both . and , are present.
 	if (text.indexOf(',') >= 0 && text.indexOf('.') >= 0) {
 		if (text.lastIndexOf(',') > text.lastIndexOf('.')) {
 			text = text.replace(/\./g, '').replace(',', '.');
@@ -341,7 +316,6 @@ function parseLocaleNumber(raw) {
 	return isNaN(num) ? NaN : num;
 }
 
-/** Finite number strictly greater than zero (Tyme uses 0 as “unset”). */
 function isPositive(value) {
 	return typeof value === 'number' && isFinite(value) && value > 0;
 }
