@@ -1,0 +1,18 @@
+# System files
+# ------------
+Icon?
+.DS_Store
+
+# Editors
+# ---------------------------
+*.sublime-workspace
+/.vscode
+/.idea
+/.nova
+.editorconfig
+
+# Local scratch
+# ---------------------------
+*.billyplugin.zip
+/tmp/
+agent-tools/
