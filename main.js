@@ -59,16 +59,16 @@ exports.importInvoices = function (fileContent, profile) {
 				totalHours: 0,
 				totalRevenue: 0,
 				hourlyRate: normalized.hourlyRate,
-				hasRate: !isNaN(normalized.hourlyRate),
+				hasRate: isPositive(normalized.hourlyRate),
 			};
 		}
 
 		var task = group.tasks[normalized.taskKey];
 		task.totalHours += normalized.hours;
-		if (!isNaN(normalized.revenue)) {
+		if (isPositive(normalized.revenue)) {
 			task.totalRevenue += normalized.revenue;
 		}
-		if (!task.hasRate && !isNaN(normalized.hourlyRate)) {
+		if (!task.hasRate && isPositive(normalized.hourlyRate)) {
 			task.hourlyRate = normalized.hourlyRate;
 			task.hasRate = true;
 		}
@@ -215,12 +215,14 @@ function normalizeEntry(entry) {
 	var date = helpers.toServiceDate(startRaw) || helpers.toServiceDate(endRaw);
 
 	var rateRaw = firstPresent(entry, RATE_ALIASES);
-	var hourlyRate = parseLocaleNumber(rateRaw);
+	// Tyme’s native JSON often ships `rate: 0` / `sum: 0` when no price is set.
+	// Treat non-positive values as missing so the Billy profile rate can apply.
+	var hourlyRate = positiveNumber(parseLocaleNumber(rateRaw));
 
 	var revenueRaw = firstPresent(entry, REVENUE_ALIASES);
-	var revenue = parseLocaleNumber(revenueRaw);
+	var revenue = positiveNumber(parseLocaleNumber(revenueRaw));
 
-	// Derive rate from revenue when the export has a sum but no explicit rate.
+	// Derive rate from revenue when the export has a positive sum but no rate.
 	if (isNaN(hourlyRate) && !isNaN(revenue) && hours > 0) {
 		hourlyRate = revenue / hours;
 	}
@@ -268,7 +270,7 @@ function buildInvoice(clientKey, group, options) {
 			if (!(hours > 0)) return null;
 
 			var unitPrice = options.fallbackRate;
-			if (t.hasRate && !isNaN(t.hourlyRate)) {
+			if (t.hasRate && isPositive(t.hourlyRate)) {
 				unitPrice = helpers.round2(t.hourlyRate);
 			} else if (t.totalRevenue > 0 && t.totalHours > 0) {
 				unitPrice = helpers.round2(t.totalRevenue / t.totalHours);
@@ -337,6 +339,15 @@ function parseLocaleNumber(raw) {
 	text = text.replace(/[^\d.-]/g, '');
 	var num = parseFloat(text);
 	return isNaN(num) ? NaN : num;
+}
+
+/** Finite number strictly greater than zero (Tyme uses 0 as “unset”). */
+function isPositive(value) {
+	return typeof value === 'number' && isFinite(value) && value > 0;
+}
+
+function positiveNumber(value) {
+	return isPositive(value) ? value : NaN;
 }
 
 function isNonBillable(billing) {

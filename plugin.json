@@ -1,10 +1,10 @@
 {
   "specVersion": 1,
   "name": "Tyme",
-  "description": "Imports time entries from a Tyme CSV or JSON export as new invoices.",
+  "description": "Imports time entries from a Tyme JSON or CSV export as new invoices.",
   "version": "1.0.0",
   "url": "",
   "author": "Billy Tyme Plugin",
   "authorUrl": "https://usebilly.app",
-  "fileExtension": "csv"
+  "fileExtension": "json"
 }
