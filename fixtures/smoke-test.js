@@ -2,6 +2,7 @@
 /**
  * Lightweight smoke test for the Tyme → Billy importer.
  * Runs with plain Node (CommonJS), no Billy host required.
+ * Fixtures are synthetic — no real customer export data.
  */
 
 var fs = require('fs');
@@ -71,27 +72,27 @@ assert.strictEqual(betaCsv.items[0].unitPrice, 80);
 var jsonPatches = plugin.importInvoices(load('sample-tyme.json'), profile);
 assert.strictEqual(jsonPatches.length, 2, 'JSON should create 2 category invoices');
 
-var intern = findInvoice(jsonPatches, 'Entwicklung Intern');
-assert.ok(intern, 'category → recipient');
-assert.strictEqual(intern.serviceDateStart, '2026-09-04');
-assert.strictEqual(intern.serviceDateEnd, '2026-09-05');
-assert.strictEqual(intern.items.length, 2, 'billed Patientenportal row skipped');
+var alpha = findInvoice(jsonPatches, 'Client Alpha');
+assert.ok(alpha, 'category → recipient');
+assert.strictEqual(alpha.serviceDateStart, '2026-09-04');
+assert.strictEqual(alpha.serviceDateEnd, '2026-09-05');
+assert.strictEqual(alpha.items.length, 2, 'billed Helix row skipped');
 
-var sysMgmt = findItem(intern, 'Entwicklung Diverses: System-Management UI/Server');
-assert.ok(sysMgmt);
-approx(sysMgmt.quantity, 38 / 60, 'minutes→hours');
-assert.strictEqual(sysMgmt.unitPrice, 100, 'rate:0 falls back to profile hourlyRate');
+var backend = findItem(alpha, 'Project Orion: Backend work');
+assert.ok(backend);
+approx(backend.quantity, 38 / 60, 'minutes→hours');
+assert.strictEqual(backend.unitPrice, 100, 'rate:0 falls back to profile hourlyRate');
 
-var chat = findItem(intern, 'Chat System Entwicklung: Rad MUC RKR');
-assert.ok(chat);
-approx(chat.quantity, 105 / 60, 'chat hours');
-assert.strictEqual(chat.unitPrice, 100);
+var designReview = findItem(alpha, 'Project Nova: Design review');
+assert.ok(designReview);
+approx(designReview.quantity, 105 / 60, 'nova hours');
+assert.strictEqual(designReview.unitPrice, 100);
 
-var extern = findInvoice(jsonPatches, 'Kunde Extern GmbH');
-assert.ok(extern);
-assert.strictEqual(extern.items.length, 1);
-assert.strictEqual(extern.items[0].unitPrice, 120, 'explicit positive rate wins');
-approx(extern.items[0].quantity, 1.5, 'extern hours');
+var clientBeta = findInvoice(jsonPatches, 'Client Beta');
+assert.ok(clientBeta);
+assert.strictEqual(clientBeta.items.length, 1);
+assert.strictEqual(clientBeta.items[0].unitPrice, 120, 'explicit positive rate wins');
+approx(clientBeta.items[0].quantity, 1.5, 'beta hours');
 
 // --- Public API payload (seconds, *_name fields) ---
 var apiPatches = plugin.importInvoices(load('sample-api-times.json'), profile);
@@ -102,28 +103,6 @@ assert.strictEqual(gamma.items.length, 1);
 assert.strictEqual(gamma.items[0].description, 'Retainer: Consulting');
 assert.strictEqual(gamma.items[0].quantity, 2);
 assert.strictEqual(gamma.items[0].unitPrice, 95);
-
-// --- Real user export from Project Store (when present) ---
-var realPath = '/cursor/stores/bc-b3425229-4f2e-45d7-b133-704f04df398f/artifacts/20260901-20260930.json';
-if (fs.existsSync(realPath)) {
-	var realPatches = plugin.importInvoices(fs.readFileSync(realPath, 'utf8'), profile);
-	assert.strictEqual(realPatches.length, 1, 'real export: one category invoice');
-	assert.strictEqual(realPatches[0].recipient.name, 'Entwicklung Intern');
-	assert.strictEqual(realPatches[0].serviceDateStart, '2026-09-04');
-	assert.strictEqual(realPatches[0].serviceDateEnd, '2026-09-25');
-	assert.strictEqual(realPatches[0].items.length, 4);
-	var total = realPatches[0].items.reduce(function (sum, item) {
-		return sum + item.quantity;
-	}, 0);
-	approx(total, 17.65, 'real export total hours');
-	realPatches[0].items.forEach(function (item) {
-		assert.strictEqual(item.unitPrice, 100, 'real export rate:0 → profile');
-		assert.strictEqual(item.unit, 'Hour');
-	});
-	console.log('Real export fixture check passed.');
-} else {
-	console.log('Real export not present; skipped store-path check.');
-}
 
 // --- Empty / junk ---
 assert.deepStrictEqual(plugin.importInvoices('', profile), []);
