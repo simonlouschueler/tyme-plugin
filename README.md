@@ -4,8 +4,8 @@ Billy-Plugin: Zeiteinträge aus einem [Tyme](https://www.tyme-app.com)-Export al
 
 ## Installation
 
-1. Den Ordner `Tyme.billyplugin` bereithalten (aus dem Release-Zip entpacken).
-2. In Billy: **Einstellungen → Plugins → Plugin hinzufügen…** und den Ordner wählen — oder hineinziehen.
+1. [`Tyme.billyplugin.zip`](https://github.com/theslash/tyme-plugin/releases/latest/download/Tyme.billyplugin.zip) herunterladen und entpacken.
+2. In Billy: **Einstellungen → Plugins → Plugin hinzufügen…** und den Ordner `Tyme.billyplugin` wählen — oder hineinziehen.
 
 ## Nutzung
 
