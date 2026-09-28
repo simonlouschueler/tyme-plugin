@@ -3,7 +3,7 @@
   "name": "Tyme",
   "description": "Importiert Zeiteinträge aus einem Tyme-JSON- oder CSV-Export als neue Rechnungen.",
   "version": "1.0.0",
-  "url": "",
+  "url": "https://github.com/theslash/tyme-plugin",
   "author": "Billy Tyme Plugin",
   "authorUrl": "https://usebilly.app",
   "fileExtension": "json"
