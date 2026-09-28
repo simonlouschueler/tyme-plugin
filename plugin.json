@@ -1,7 +1,7 @@
 {
   "specVersion": 1,
   "name": "Tyme",
-  "description": "Imports time entries from a Tyme JSON or CSV export as new invoices.",
+  "description": "Importiert Zeiteinträge aus einem Tyme-JSON- oder CSV-Export als neue Rechnungen.",
   "version": "1.0.0",
   "url": "",
   "author": "Billy Tyme Plugin",
